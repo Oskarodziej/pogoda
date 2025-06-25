@@ -1,26 +1,89 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Moja Stacja Pogodowa</title>
-  </head>
-  <body>
-    <h1>Temperatura i wilgotność</h1>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pogoda w pokoju</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: #f0f4f8;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      color: #333;
+      text-align: center;
+    }
+    canvas {
+      max-width: 100%;
+      margin-bottom: 40px;
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+    .chart-container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌡️ Pogoda w pokoju</h1>
+  <div class="chart-container">
+    <canvas id="tempChart"></canvas>
+  </div>
+  <div class="chart-container">
+    <canvas id="humChart"></canvas>
+  </div>
 
-    <h2>Temperatura</h2>
-    <iframe
-      width="450"
-      height="260"
-      style="border: 1px solid #cccccc;"
-      src="https://thingspeak.com/channels/2995908/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line"
-    ></iframe>
+  <script>
+    const channelID = 2995908;
+    const fetchInterval = 16000; // 16 sekund
 
-    <h2>Wilgotność</h2>
-    <iframe
-      width="450"
-      height="260"
-      style="border: 1px solid #cccccc;"
-      src="https://thingspeak.com/channels/2995908/charts/2?bgcolor=%23ffffff&color=%2300aaff&dynamic=true&results=60&type=line"
-    ></iframe>
-  </body>
+    async function fetchThingSpeakData(field) {
+      const url = `https://api.thingspeak.com/channels/${channelID}/fields/${field}.json?results=20`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const labels = data.feeds.map(entry => entry.created_at.slice(11, 19));
+      const values = data.feeds.map(entry => parseFloat(entry[`field${field}`]));
+      return { labels, values };
+    }
+
+    function drawChart(canvasId, label, color, labels, values) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: values,
+            fill: false,
+            borderColor: color,
+            tension: 0.3,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: false },
+            x: { ticks: { autoSkip: true, maxTicksLimit: 10 } }
+          }
+        }
+      });
+    }
+
+    async function updateCharts() {
+      const temp = await fetchThingSpeakData(1); // Field 1 - temperatura
+      const hum = await fetchThingSpeakData(2); // Field 2 - wilgotnosc
+
+      drawChart('tempChart', 'Temperatura [°C]', '#ff6384', temp.labels, temp.values);
+      drawChart('humChart', 'Wilgotność [%]', '#36a2eb', hum.labels, hum.values);
+    }
+
+    updateCharts();
+    setInterval(() => location.reload(), fetchInterval);
+  </script>
+</body>
 </html>
